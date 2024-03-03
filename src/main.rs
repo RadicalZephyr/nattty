@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
-use std::fmt;
+use std::{fmt, io::BufRead};
+
+use sodium::{SodiumCtx, StreamSink};
 
 #[derive(Copy, Clone, Debug)]
 enum Mark {
@@ -51,12 +53,15 @@ impl fmt::Display for Board {
 }
 
 fn main() {
-    let board = Board::new();
-    println!("{}", board);
-    let board = board.mark(2, Mark::X);
-    println!("{}", board);
-    let board = board.mark(4, Mark::X);
-    println!("{}", board);
-    let board = board.mark(6, Mark::X);
-    println!("{}", board);
+    let ctx = SodiumCtx::new();
+
+    let kb_input: StreamSink<String> = ctx.new_stream_sink();
+    let _l = kb_input
+        .stream()
+        .listen(|line: &String| println!("Hello {}", line));
+
+    let stdin = std::io::stdin().lock();
+    for line in stdin.lines() {
+        kb_input.send(line.unwrap());
+    }
 }
