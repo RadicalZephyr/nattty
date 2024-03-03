@@ -2,12 +2,20 @@
 
 use std::{fmt, io::BufRead, num::ParseIntError};
 
-use sodium::{SodiumCtx, StreamSink};
+use sodium::{CellLoop, SodiumCtx, StreamSink};
 
 #[derive(Copy, Clone, Debug)]
 enum Mark {
     X,
     O,
+}
+impl Mark {
+    fn swap(&self) -> Mark {
+        match self {
+            Mark::X => Mark::O,
+            Mark::O => Mark::X,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -66,11 +74,30 @@ fn main() {
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
     listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
 
-    let ok_stream = parsed_result_stream
+    let index_stream = parsed_result_stream
         .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
 
-    listeners.push(ok_stream.listen(|index: &usize| println!("make a move at index {}", index)));
+    // Alternate marks
+    let turn_cell_loop: CellLoop<Mark> = ctx.new_cell_loop();
+
+    let turn_cell = index_stream
+        .snapshot(&turn_cell_loop.cell(), |_index: &usize, turn: &Mark| {
+            turn.swap()
+        })
+        .hold(Mark::X);
+
+    turn_cell_loop.loop_(&turn_cell);
+
+    let index_mark_stream = index_stream
+        .snapshot(&turn_cell_loop.cell(), |index: &usize, turn: &Mark| {
+            (*index, *turn)
+        });
+    listeners.push(
+        index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
+            println!("Mark an {:?} at index {}", mark, index)
+        }),
+    );
 
     let stdin = std::io::stdin().lock();
     for line in stdin.lines() {
