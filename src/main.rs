@@ -2,7 +2,7 @@
 
 use std::{fmt, io::BufRead, num::ParseIntError};
 
-use sodium::{CellLoop, SodiumCtx, StreamSink};
+use sodium::{Cell, CellLoop, SodiumCtx, Stream, StreamSink};
 
 #[derive(Copy, Clone, Debug)]
 enum Mark {
@@ -79,15 +79,22 @@ fn main() {
             .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
             .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
 
-        let valid_index_stream = index_stream.filter(|index: &usize| (0..=9).contains(index));
+        let valid_index_stream = index_stream.filter(|index: &usize| (0..9).contains(index));
         listeners.push(
             index_stream
-                .filter(|index: &usize| !(0..=9).contains(index))
+                .filter(|index: &usize| !(0..9).contains(index))
                 .listen(|index: &usize| println!("invalid index: {}! try again", index)),
         );
 
         // Alternate marks
         let turn_cell = mark_swapping(&ctx, &valid_index_stream);
+
+        let board_cell = update_board(&ctx, &valid_index_stream, &turn_cell);
+        listeners.push(
+            board_cell
+                .updates()
+                .listen(|board: &Board| println!("{}", board)),
+        );
 
         let index_mark_stream =
             valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
@@ -104,7 +111,29 @@ fn main() {
     }
 }
 
-fn mark_swapping(ctx: &SodiumCtx, index_stream: &sodium::Stream<usize>) -> sodium::Cell<Mark> {
+fn update_board(
+    ctx: &SodiumCtx,
+    index_stream: &Stream<usize>,
+    mark_cell: &Cell<Mark>,
+) -> Cell<Board> {
+    ctx.transaction(|| {
+        let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
+        let board_cell_fwd = board_cell_loop.cell();
+
+        let board_cell = index_stream
+            .snapshot3(
+                &board_cell_fwd,
+                mark_cell,
+                |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
+            )
+            .hold(Board::new());
+
+        board_cell_loop.loop_(&board_cell);
+        board_cell
+    })
+}
+
+fn mark_swapping(ctx: &SodiumCtx, index_stream: &Stream<usize>) -> Cell<Mark> {
     ctx.transaction(|| {
         let turn_cell_loop: CellLoop<Mark> = ctx.new_cell_loop();
 
