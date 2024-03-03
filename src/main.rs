@@ -79,11 +79,11 @@ impl Board {
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let ds = self.display_squares();
-        writeln!(f, " {} | {} | {}", ds[0], ds[1], ds[2])?;
+        writeln!(f, " {} | {} | {}", ds[6], ds[7], ds[8])?;
         f.write_str("---+---+---\n")?;
         writeln!(f, " {} | {} | {}", ds[3], ds[4], ds[5])?;
         f.write_str("---+---+---\n")?;
-        writeln!(f, " {} | {} | {}", ds[6], ds[7], ds[8])?;
+        writeln!(f, " {} | {} | {}", ds[0], ds[1], ds[2])?;
         Ok(())
     }
 }
@@ -161,7 +161,9 @@ fn validate_index(
         .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
 
-    let valid_index_stream = index_stream.filter(|index: &usize| (0..9).contains(index));
+    let valid_index_stream = index_stream
+        .filter(|index: &usize| (1..=9).contains(index))
+        .map(|index: &usize| index - 1);
     // listeners.push(
     //     index_stream
     //         .filter(|index: &usize| !(0..9).contains(index))
