@@ -78,11 +78,18 @@ fn main() {
         .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
 
+    let valid_index_stream = index_stream.filter(|index: &usize| (0..=9).contains(index));
+    listeners.push(
+        index_stream
+            .filter(|index: &usize| !(0..=9).contains(index))
+            .listen(|index: &usize| println!("invalid index: {}! try again", index)),
+    );
+
     // Alternate marks
-    let turn_cell = mark_swapping(ctx, &index_stream);
+    let turn_cell = mark_swapping(ctx, &valid_index_stream);
 
     let index_mark_stream =
-        index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
+        valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
     listeners.push(
         index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
             println!("Mark an {:?} at index {}", mark, index)
