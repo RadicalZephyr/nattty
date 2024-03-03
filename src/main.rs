@@ -4,7 +4,21 @@ use std::{fmt, io::BufRead, num::ParseIntError};
 
 use sodium::{Cell, CellLoop, SodiumCtx, Stream, StreamSink};
 
-#[derive(Copy, Clone, Debug)]
+const WIN_SEQUENCES: [[usize; 3]; 8] = [
+    // Horizontal
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    // Vertical
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    // Diagonal
+    [0, 4, 8],
+    [2, 4, 6],
+];
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Mark {
     X,
     O,
@@ -49,6 +63,16 @@ impl Board {
 
     fn is_valid_move(&self, index: usize) -> bool {
         self.squares[index].is_none()
+    }
+
+    fn get_winner(&self) -> Option<Mark> {
+        for seq in WIN_SEQUENCES {
+            let first = self.squares[seq[0]];
+            if first.is_some() && seq.iter().map(|i| self.squares[*i]).all(|x| x == first) {
+                return first;
+            }
+        }
+        None
     }
 }
 
@@ -103,13 +127,12 @@ fn set_up_play(
         println!("\nMark an {:?} at index {}:", mark, index)
     }));
 
-    let board_cell = valid_index_stream
-        .snapshot3(
-            &board_cell_fwd,
-            &turn_cell,
-            |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
-        )
-        .hold(Board::new());
+    let board_stream = &valid_index_stream.snapshot3(
+        &board_cell_fwd,
+        &turn_cell,
+        |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
+    );
+    let board_cell = board_stream.hold(Board::new());
     board_cell_loop.loop_(&board_cell);
 
     listeners.push(
@@ -117,6 +140,11 @@ fn set_up_play(
             .updates()
             .listen(|board: &Board| println!("{}", board)),
     );
+
+    let winner_stream = board_stream
+        .map(|board: &Board| board.get_winner())
+        .filter_option();
+    listeners.push(winner_stream.listen(|mark: &Mark| println!("{:?} has won the game!", mark)));
 }
 
 fn validate_index(
