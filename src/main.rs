@@ -46,6 +46,10 @@ impl Board {
         }
         display
     }
+
+    fn is_valid_move(&self, index: usize) -> bool {
+        self.squares[index].is_none()
+    }
 }
 
 impl fmt::Display for Board {
@@ -85,7 +89,10 @@ fn set_up_play(
 ) {
     let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
 
-    let valid_index_stream = validate_index(parsed_result_stream, listeners);
+    let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
+    let board_cell_fwd = board_cell_loop.cell();
+
+    let valid_index_stream = validate_index(parsed_result_stream, &board_cell_fwd, listeners);
 
     // Alternate marks
     let turn_cell = mark_swapping(ctx, &valid_index_stream);
@@ -96,7 +103,15 @@ fn set_up_play(
         println!("\nMark an {:?} at index {}:", mark, index)
     }));
 
-    let board_cell = update_board(ctx, &valid_index_stream, &turn_cell);
+    let board_cell = valid_index_stream
+        .snapshot3(
+            &board_cell_fwd,
+            &turn_cell,
+            |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
+        )
+        .hold(Board::new());
+    board_cell_loop.loop_(&board_cell);
+
     listeners.push(
         board_cell
             .updates()
@@ -106,6 +121,7 @@ fn set_up_play(
 
 fn validate_index(
     parsed_result_stream: &Stream<Result<usize, ParseIntError>>,
+    board_cell: &Cell<Board>,
     listeners: &mut Vec<sodium::Listener>,
 ) -> Stream<usize> {
     // Handle errors in the input!
@@ -124,28 +140,11 @@ fn validate_index(
             .filter(|index: &usize| !(0..9).contains(index))
             .listen(|index: &usize| println!("invalid index: {}! try again", index)),
     );
-    valid_index_stream
-}
 
-fn update_board(
-    ctx: &SodiumCtx,
-    index_stream: &Stream<usize>,
-    mark_cell: &Cell<Mark>,
-) -> Cell<Board> {
-    ctx.transaction(|| {
-        let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
-        let board_cell_fwd = board_cell_loop.cell();
-
-        let board_cell = index_stream
-            .snapshot3(
-                &board_cell_fwd,
-                mark_cell,
-                |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
-            )
-            .hold(Board::new());
-
-        board_cell_loop.loop_(&board_cell);
-        board_cell
+    let board_cell = board_cell.clone();
+    valid_index_stream.filter(move |index: &usize| {
+        let board = board_cell.sample();
+        board.is_valid_move(*index)
     })
 }
 
