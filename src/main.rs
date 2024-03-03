@@ -85,22 +85,7 @@ fn set_up_play(
 ) {
     let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
 
-    // Handle errors in the input!
-    let err_stream = parsed_result_stream
-        .filter(|res: &Result<usize, ParseIntError>| res.is_err())
-        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
-    listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
-
-    let index_stream = parsed_result_stream
-        .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
-        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
-
-    let valid_index_stream = index_stream.filter(|index: &usize| (0..9).contains(index));
-    listeners.push(
-        index_stream
-            .filter(|index: &usize| !(0..9).contains(index))
-            .listen(|index: &usize| println!("invalid index: {}! try again", index)),
-    );
+    let valid_index_stream = validate_index(parsed_result_stream, listeners);
 
     // Alternate marks
     let turn_cell = mark_swapping(ctx, &valid_index_stream);
@@ -117,6 +102,29 @@ fn set_up_play(
             .updates()
             .listen(|board: &Board| println!("{}", board)),
     );
+}
+
+fn validate_index(
+    parsed_result_stream: &Stream<Result<usize, ParseIntError>>,
+    listeners: &mut Vec<sodium::Listener>,
+) -> Stream<usize> {
+    // Handle errors in the input!
+    let err_stream = parsed_result_stream
+        .filter(|res: &Result<usize, ParseIntError>| res.is_err())
+        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
+    listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
+
+    let index_stream = parsed_result_stream
+        .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
+        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
+
+    let valid_index_stream = index_stream.filter(|index: &usize| (0..9).contains(index));
+    listeners.push(
+        index_stream
+            .filter(|index: &usize| !(0..9).contains(index))
+            .listen(|index: &usize| println!("invalid index: {}! try again", index)),
+    );
+    valid_index_stream
 }
 
 fn update_board(
