@@ -19,6 +19,12 @@ impl Board {
         Self { squares }
     }
 
+    fn mark(&self, index: usize, mark: Mark) -> Board {
+        let mut new_board = *self;
+        new_board.squares[index] = Some(mark);
+        new_board
+    }
+
     fn display_squares(&self) -> [&'static str; 9] {
         let mut display = [""; 9];
         for (dsquare, square) in display.iter_mut().zip(self.squares.iter()) {
@@ -45,9 +51,12 @@ impl fmt::Display for Board {
 }
 
 fn main() {
-    let mut board = Board::new();
-    board.squares[2] = Some(Mark::X);
-    board.squares[4] = Some(Mark::X);
-    board.squares[6] = Some(Mark::X);
+    let board = Board::new();
+    println!("{}", board);
+    let board = board.mark(2, Mark::X);
+    println!("{}", board);
+    let board = board.mark(4, Mark::X);
+    println!("{}", board);
+    let board = board.mark(6, Mark::X);
     println!("{}", board);
 }
