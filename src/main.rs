@@ -79,20 +79,10 @@ fn main() {
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
 
     // Alternate marks
-    let turn_cell_loop: CellLoop<Mark> = ctx.new_cell_loop();
+    let turn_cell = mark_swapping(ctx, &index_stream);
 
-    let turn_cell = index_stream
-        .snapshot(&turn_cell_loop.cell(), |_index: &usize, turn: &Mark| {
-            turn.swap()
-        })
-        .hold(Mark::X);
-
-    turn_cell_loop.loop_(&turn_cell);
-
-    let index_mark_stream = index_stream
-        .snapshot(&turn_cell_loop.cell(), |index: &usize, turn: &Mark| {
-            (*index, *turn)
-        });
+    let index_mark_stream =
+        index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
     listeners.push(
         index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
             println!("Mark an {:?} at index {}", mark, index)
@@ -103,4 +93,18 @@ fn main() {
     for line in stdin.lines() {
         kb_input.send(line.unwrap());
     }
+}
+
+fn mark_swapping(ctx: SodiumCtx, index_stream: &sodium::Stream<usize>) -> sodium::Cell<Mark> {
+    ctx.transaction(|| {
+        let turn_cell_loop: CellLoop<Mark> = ctx.new_cell_loop();
+
+        let turn_cell_fwd = turn_cell_loop.cell();
+        let turn_cell = index_stream
+            .snapshot(&turn_cell_fwd, |_index: &usize, turn: &Mark| turn.swap())
+            .hold(Mark::X);
+
+        turn_cell_loop.loop_(&turn_cell);
+        turn_cell
+    })
 }
