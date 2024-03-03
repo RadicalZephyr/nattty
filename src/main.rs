@@ -67,40 +67,7 @@ fn main() {
         let mut listeners = Vec::new();
         let kb_input: StreamSink<String> = ctx.new_stream_sink();
 
-        let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
-
-        // Handle errors in the input!
-        let err_stream = parsed_result_stream
-            .filter(|res: &Result<usize, ParseIntError>| res.is_err())
-            .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
-        listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
-
-        let index_stream = parsed_result_stream
-            .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
-            .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
-
-        let valid_index_stream = index_stream.filter(|index: &usize| (0..9).contains(index));
-        listeners.push(
-            index_stream
-                .filter(|index: &usize| !(0..9).contains(index))
-                .listen(|index: &usize| println!("invalid index: {}! try again", index)),
-        );
-
-        // Alternate marks
-        let turn_cell = mark_swapping(&ctx, &valid_index_stream);
-
-        let index_mark_stream =
-            valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
-        listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
-            println!("\nMark an {:?} at index {}:", mark, index)
-        }));
-
-        let board_cell = update_board(&ctx, &valid_index_stream, &turn_cell);
-        listeners.push(
-            board_cell
-                .updates()
-                .listen(|board: &Board| println!("{}", board)),
-        );
+        set_up_play(&kb_input, &mut listeners, &ctx);
 
         (kb_input, listeners)
     });
@@ -109,6 +76,47 @@ fn main() {
     for line in stdin.lines() {
         kb_input.send(line.unwrap());
     }
+}
+
+fn set_up_play(
+    kb_input: &StreamSink<String>,
+    listeners: &mut Vec<sodium::Listener>,
+    ctx: &SodiumCtx,
+) {
+    let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
+
+    // Handle errors in the input!
+    let err_stream = parsed_result_stream
+        .filter(|res: &Result<usize, ParseIntError>| res.is_err())
+        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
+    listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
+
+    let index_stream = parsed_result_stream
+        .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
+        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
+
+    let valid_index_stream = index_stream.filter(|index: &usize| (0..9).contains(index));
+    listeners.push(
+        index_stream
+            .filter(|index: &usize| !(0..9).contains(index))
+            .listen(|index: &usize| println!("invalid index: {}! try again", index)),
+    );
+
+    // Alternate marks
+    let turn_cell = mark_swapping(ctx, &valid_index_stream);
+
+    let index_mark_stream =
+        valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
+    listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
+        println!("\nMark an {:?} at index {}:", mark, index)
+    }));
+
+    let board_cell = update_board(ctx, &valid_index_stream, &turn_cell);
+    listeners.push(
+        board_cell
+            .updates()
+            .listen(|board: &Board| println!("{}", board)),
+    );
 }
 
 fn update_board(
