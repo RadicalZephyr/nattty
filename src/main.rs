@@ -116,7 +116,7 @@ fn set_up_play(
     let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
     let board_cell_fwd = board_cell_loop.cell();
 
-    let valid_index_stream = validate_index(parsed_result_stream, &board_cell_fwd, listeners);
+    let valid_index_stream = validate_index(parsed_result_stream, &board_cell_fwd);
 
     // Alternate marks
     let turn_cell = mark_swapping(ctx, &valid_index_stream);
@@ -150,24 +150,23 @@ fn set_up_play(
 fn validate_index(
     parsed_result_stream: &Stream<Result<usize, ParseIntError>>,
     board_cell: &Cell<Board>,
-    listeners: &mut Vec<sodium::Listener>,
 ) -> Stream<usize> {
     // Handle errors in the input!
     let err_stream = parsed_result_stream
         .filter(|res: &Result<usize, ParseIntError>| res.is_err())
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
-    listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
+    // listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
 
     let index_stream = parsed_result_stream
         .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
 
     let valid_index_stream = index_stream.filter(|index: &usize| (0..9).contains(index));
-    listeners.push(
-        index_stream
-            .filter(|index: &usize| !(0..9).contains(index))
-            .listen(|index: &usize| println!("invalid index: {}! try again", index)),
-    );
+    // listeners.push(
+    //     index_stream
+    //         .filter(|index: &usize| !(0..9).contains(index))
+    //         .listen(|index: &usize| println!("invalid index: {}! try again", index)),
+    // );
 
     let board_cell = board_cell.clone();
     valid_index_stream.filter(move |index: &usize| {
