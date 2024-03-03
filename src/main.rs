@@ -89,18 +89,18 @@ fn main() {
         // Alternate marks
         let turn_cell = mark_swapping(&ctx, &valid_index_stream);
 
+        let index_mark_stream =
+            valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
+        listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
+            println!("\nMark an {:?} at index {}:", mark, index)
+        }));
+
         let board_cell = update_board(&ctx, &valid_index_stream, &turn_cell);
         listeners.push(
             board_cell
                 .updates()
                 .listen(|board: &Board| println!("{}", board)),
         );
-
-        let index_mark_stream =
-            valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
-        listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
-            println!("Mark an {:?} at index {}", mark, index)
-        }));
 
         (kb_input, listeners)
     });
