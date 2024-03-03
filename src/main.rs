@@ -61,40 +61,42 @@ impl fmt::Display for Board {
 }
 
 fn main() {
-    let mut listeners = Vec::new();
     let ctx = SodiumCtx::new();
 
-    let kb_input: StreamSink<String> = ctx.new_stream_sink();
+    let (kb_input, _listeners) = ctx.transaction(|| {
+        let mut listeners = Vec::new();
+        let kb_input: StreamSink<String> = ctx.new_stream_sink();
 
-    let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
+        let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
 
-    // Handle errors in the input!
-    let err_stream = parsed_result_stream
-        .filter(|res: &Result<usize, ParseIntError>| res.is_err())
-        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
-    listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
+        // Handle errors in the input!
+        let err_stream = parsed_result_stream
+            .filter(|res: &Result<usize, ParseIntError>| res.is_err())
+            .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
+        listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
 
-    let index_stream = parsed_result_stream
-        .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
-        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
+        let index_stream = parsed_result_stream
+            .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
+            .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
 
-    let valid_index_stream = index_stream.filter(|index: &usize| (0..=9).contains(index));
-    listeners.push(
-        index_stream
-            .filter(|index: &usize| !(0..=9).contains(index))
-            .listen(|index: &usize| println!("invalid index: {}! try again", index)),
-    );
+        let valid_index_stream = index_stream.filter(|index: &usize| (0..=9).contains(index));
+        listeners.push(
+            index_stream
+                .filter(|index: &usize| !(0..=9).contains(index))
+                .listen(|index: &usize| println!("invalid index: {}! try again", index)),
+        );
 
-    // Alternate marks
-    let turn_cell = mark_swapping(ctx, &valid_index_stream);
+        // Alternate marks
+        let turn_cell = mark_swapping(&ctx, &valid_index_stream);
 
-    let index_mark_stream =
-        valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
-    listeners.push(
-        index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
+        let index_mark_stream =
+            valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
+        listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
             println!("Mark an {:?} at index {}", mark, index)
-        }),
-    );
+        }));
+
+        (kb_input, listeners)
+    });
 
     let stdin = std::io::stdin().lock();
     for line in stdin.lines() {
@@ -102,7 +104,7 @@ fn main() {
     }
 }
 
-fn mark_swapping(ctx: SodiumCtx, index_stream: &sodium::Stream<usize>) -> sodium::Cell<Mark> {
+fn mark_swapping(ctx: &SodiumCtx, index_stream: &sodium::Stream<usize>) -> sodium::Cell<Mark> {
     ctx.transaction(|| {
         let turn_cell_loop: CellLoop<Mark> = ctx.new_cell_loop();
 
