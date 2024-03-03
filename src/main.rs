@@ -111,12 +111,11 @@ fn set_up_play(
     listeners: &mut Vec<sodium::Listener>,
     ctx: &SodiumCtx,
 ) {
-    let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
-
     let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
     let board_cell_fwd = board_cell_loop.cell();
 
-    let valid_index_stream = validate_index(parsed_result_stream, &board_cell_fwd);
+    let kb_stream = kb_input.stream();
+    let valid_index_stream = validate_index(&kb_stream, &board_cell_fwd);
 
     // Alternate marks
     let turn_cell = mark_swapping(ctx, &valid_index_stream);
@@ -147,10 +146,9 @@ fn set_up_play(
     listeners.push(winner_stream.listen(|mark: &Mark| println!("{:?} has won the game!", mark)));
 }
 
-fn validate_index(
-    parsed_result_stream: &Stream<Result<usize, ParseIntError>>,
-    board_cell: &Cell<Board>,
-) -> Stream<usize> {
+fn validate_index(input_stream: &Stream<String>, board_cell: &Cell<Board>) -> Stream<usize> {
+    let parsed_result_stream = &input_stream.map(|line: &String| line.parse::<usize>());
+
     // Handle errors in the input!
     let _err_stream = parsed_result_stream
         .filter(|res: &Result<usize, ParseIntError>| res.is_err())
