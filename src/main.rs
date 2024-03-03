@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{fmt, io::BufRead};
+use std::{fmt, io::BufRead, num::ParseIntError};
 
 use sodium::{SodiumCtx, StreamSink};
 
@@ -53,12 +53,24 @@ impl fmt::Display for Board {
 }
 
 fn main() {
+    let mut listeners = Vec::new();
     let ctx = SodiumCtx::new();
 
     let kb_input: StreamSink<String> = ctx.new_stream_sink();
-    let _l = kb_input
-        .stream()
-        .listen(|line: &String| println!("Hello {}", line));
+
+    let parsed_result_stream = &kb_input.stream().map(|line: &String| line.parse::<usize>());
+
+    // Handle errors in the input!
+    let err_stream = parsed_result_stream
+        .filter(|res: &Result<usize, ParseIntError>| res.is_err())
+        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
+    listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
+
+    let ok_stream = parsed_result_stream
+        .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
+        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
+
+    listeners.push(ok_stream.listen(|index: &usize| println!("make a move at index {}", index)));
 
     let stdin = std::io::stdin().lock();
     for line in stdin.lines() {
