@@ -152,7 +152,7 @@ fn validate_index(
     board_cell: &Cell<Board>,
 ) -> Stream<usize> {
     // Handle errors in the input!
-    let err_stream = parsed_result_stream
+    let _err_stream = parsed_result_stream
         .filter(|res: &Result<usize, ParseIntError>| res.is_err())
         .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
     // listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
