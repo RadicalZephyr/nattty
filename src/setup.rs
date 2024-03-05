@@ -4,6 +4,12 @@ use sodium::{Cell, CellLoop, SodiumCtx, Stream, StreamSink};
 
 use super::board::{Board, Mark};
 
+struct IndexValidator {
+    valid_move_stream: Stream<usize>,
+    parse_int_err_stream: Stream<ParseIntError>,
+    invalid_index_stream: Stream<usize>,
+}
+
 pub fn set_up_play(
     kb_input: &StreamSink<String>,
     listeners: &mut Vec<sodium::Listener>,
@@ -13,18 +19,27 @@ pub fn set_up_play(
     let board_cell_fwd = board_cell_loop.cell();
 
     let kb_stream = kb_input.stream();
-    let valid_index_stream = validate_index(&kb_stream, &board_cell_fwd);
+    let IndexValidator {
+        valid_move_stream,
+        parse_int_err_stream: _,
+        invalid_index_stream: _,
+    } = IndexValidator::new(&kb_stream, &board_cell_fwd);
+    // listeners.push(parse_int_err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
+    // listeners.push(
+    //     invalid_index_stream
+    //         .listen(|index: &usize| println!("invalid index: {}! try again", index)),
+    // );
 
     // Alternate marks
-    let turn_cell = mark_swapping(ctx, &valid_index_stream);
+    let turn_cell = mark_swapping(ctx, &valid_move_stream);
 
     let index_mark_stream =
-        valid_index_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
+        valid_move_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
     listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
         println!("\nMark an {:?} at index {}:", mark, index)
     }));
 
-    let board_stream = &valid_index_stream.snapshot3(
+    let board_stream = &valid_move_stream.snapshot3(
         &board_cell_fwd,
         &turn_cell,
         |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
@@ -44,33 +59,29 @@ pub fn set_up_play(
     listeners.push(winner_stream.listen(|mark: &Mark| println!("{:?} has won the game!", mark)));
 }
 
-fn validate_index(input_stream: &Stream<String>, board_cell: &Cell<Board>) -> Stream<usize> {
-    let parsed_result_stream = &input_stream.map(|line: &String| line.parse::<usize>());
+impl IndexValidator {
+    fn new(input_stream: &Stream<String>, board_cell: &Cell<Board>) -> IndexValidator {
+        let (index_stream, parse_int_err_stream) = input_stream
+            .map(|line: &String| line.parse::<usize>())
+            .split_res();
 
-    // Handle errors in the input!
-    let _err_stream = parsed_result_stream
-        .filter(|res: &Result<usize, ParseIntError>| res.is_err())
-        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap_err());
-    // listeners.push(err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
+        let valid_index_stream = index_stream
+            .filter(|index: &usize| (1..=9).contains(index))
+            .map(|index: &usize| index - 1);
+        let invalid_index_stream = index_stream.filter(|index: &usize| !(1..=9).contains(index));
 
-    let index_stream = parsed_result_stream
-        .filter(|res: &Result<usize, ParseIntError>| res.is_ok())
-        .map(|res: &Result<usize, ParseIntError>| res.clone().unwrap());
+        let board_cell = board_cell.clone();
+        let valid_move_stream = valid_index_stream.filter(move |index: &usize| {
+            let board = board_cell.sample();
+            board.is_valid_move(*index)
+        });
 
-    let valid_index_stream = index_stream
-        .filter(|index: &usize| (1..=9).contains(index))
-        .map(|index: &usize| index - 1);
-    // listeners.push(
-    //     index_stream
-    //         .filter(|index: &usize| !(0..9).contains(index))
-    //         .listen(|index: &usize| println!("invalid index: {}! try again", index)),
-    // );
-
-    let board_cell = board_cell.clone();
-    valid_index_stream.filter(move |index: &usize| {
-        let board = board_cell.sample();
-        board.is_valid_move(*index)
-    })
+        IndexValidator {
+            valid_move_stream,
+            parse_int_err_stream,
+            invalid_index_stream,
+        }
+    }
 }
 
 fn mark_swapping(ctx: &SodiumCtx, index_stream: &Stream<usize>) -> Cell<Mark> {
