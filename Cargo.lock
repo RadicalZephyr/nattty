@@ -95,9 +95,9 @@ checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 
 [[package]]
 name = "sodium"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7c8fb5e94b402b450eb0e3de2035c3560347682ad0082e367d337450caeff2e"
+checksum = "987f30883135d56d4d5b1e05fc4caba16149083f396a1e69194985049d3d5321"
 dependencies = [
  "log",
  "parking_lot",
