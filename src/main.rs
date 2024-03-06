@@ -2,13 +2,10 @@
 
 use std::io::BufRead;
 
-use board::{Board, Mark};
 use sodium::{SodiumCtx, StreamSink};
 
-pub(crate) mod board;
-
 mod tic_tac_toe;
-use tic_tac_toe::{Error, TicTacToe};
+use tic_tac_toe::{Board, Error, Mark, TicTacToe};
 
 fn main() {
     let ctx = SodiumCtx::new();

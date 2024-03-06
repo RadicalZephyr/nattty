@@ -3,7 +3,8 @@ use std::num::ParseIntError;
 use sodium::{Cell, CellLoop, SodiumCtx, Stream, StreamSink};
 use thiserror::Error;
 
-use super::board::{Board, Mark};
+mod board;
+pub use board::{Board, Mark};
 
 #[derive(Clone, Debug, Error)]
 pub enum Error {
