@@ -13,7 +13,8 @@ fn main() {
         let boot: StreamSink<()> = ctx.new_stream_sink();
         let kb_input: StreamSink<String> = ctx.new_stream_sink();
 
-        let game_seq = SequenceOfGames::new(&ctx, &boot.stream(), &kb_input.stream());
+        let kb_stream = kb_input.stream();
+        let game_seq = SequenceOfGames::new(&ctx, &boot.stream(), &kb_stream);
 
         listeners.push(boot.stream().listen(|_: &()| {
             println!("Welcome to Tic Tac Toe!\n");
@@ -22,7 +23,7 @@ fn main() {
             println!("Who is playing today?");
         }));
 
-        let game = TicTacToe::new(&ctx, &kb_input.stream().gate(&game_seq.playing));
+        let game = TicTacToe::new(&ctx, &kb_stream.gate(&game_seq.playing));
 
         listeners.push(game_seq.start_game.listen({
             let turn = game.turn.clone();

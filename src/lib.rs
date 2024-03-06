@@ -40,12 +40,24 @@ struct IndexValidator {
 }
 
 impl SequenceOfGames {
-    pub fn new(ctx: &SodiumCtx, boot: &Stream<()>, kb_input: &Stream<String>) -> SequenceOfGames {
+    pub fn new(
+        ctx: &SodiumCtx,
+        new_matchup: &Stream<()>,
+        kb_input: &Stream<String>,
+    ) -> SequenceOfGames {
         let start_game = ctx.new_stream();
+
         let playing_cell = start_game.map(|_: &()| true).hold(false);
+        let not_playing_cell = playing_cell.map(|p: &bool| !p);
+
+        let kb_input = kb_input.gate(&not_playing_cell);
+
+        let prompt_player_name = new_matchup.gate(&not_playing_cell);
+
+        let start_game = ctx.new_stream();
         SequenceOfGames {
             playing: playing_cell,
-            prompt_player_name: boot.clone(),
+            prompt_player_name,
             start_game,
         }
     }
