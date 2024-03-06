@@ -1,45 +1,50 @@
 use std::num::ParseIntError;
 
 use sodium::{Cell, CellLoop, SodiumCtx, Stream, StreamSink};
+use thiserror::Error;
 
 use super::board::{Board, Mark};
 
-struct IndexValidator {
-    valid_move_stream: Stream<usize>,
-    invalid_move_stream: Stream<usize>,
-    invalid_index_stream: Stream<usize>,
-    parse_int_err_stream: Stream<ParseIntError>,
+#[derive(Clone, Debug, Error)]
+pub enum Error {
+    #[error("invalid move: square {0} is already taken!")]
+    InvalidMove(usize),
+
+    #[error("invalid index: {0}!")]
+    InvalidIndex(usize),
+
+    #[error("invalid input: {0}!")]
+    InvalidInteger(ParseIntError),
 }
 
-pub fn set_up_play(
-    kb_input: &StreamSink<String>,
-    listeners: &mut Vec<sodium::Listener>,
-    ctx: &SodiumCtx,
-) {
+pub struct TicTacToe {
+    pub board: Cell<Board>,
+    pub turn: Cell<Mark>,
+    pub moves: Stream<(usize, Mark)>,
+    pub winner: Stream<Mark>,
+    pub error: Stream<Error>,
+}
+
+struct IndexValidator {
+    valid_move_stream: Stream<usize>,
+    error_stream: Stream<Error>,
+}
+
+pub fn set_up_play(kb_input: &StreamSink<String>, ctx: &SodiumCtx) -> TicTacToe {
     let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
     let board_cell_fwd = board_cell_loop.cell();
 
     let kb_stream = kb_input.stream();
     let IndexValidator {
         valid_move_stream,
-        invalid_move_stream: _,
-        invalid_index_stream: _,
-        parse_int_err_stream: _,
+        error_stream,
     } = IndexValidator::new(&kb_stream, &board_cell_fwd);
-    // listeners.push(parse_int_err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
-    // listeners.push(
-    //     invalid_index_stream
-    //         .listen(|index: &usize| println!("invalid index: {}! try again", index)),
-    // );
 
     // Alternate marks
     let turn_cell = mark_swapping(ctx, &valid_move_stream);
 
     let index_mark_stream =
         valid_move_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
-    listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
-        println!("\nMark an {:?} at index {}:", mark, index)
-    }));
 
     let board_stream = &valid_move_stream.snapshot3(
         &board_cell_fwd,
@@ -49,16 +54,17 @@ pub fn set_up_play(
     let board_cell = board_stream.hold(Board::new());
     board_cell_loop.loop_(&board_cell);
 
-    listeners.push(
-        board_cell
-            .updates()
-            .listen(|board: &Board| println!("{}", board)),
-    );
-
     let winner_stream = board_stream
         .map(|board: &Board| board.get_winner())
         .filter_option();
-    listeners.push(winner_stream.listen(|mark: &Mark| println!("{:?} has won the game!", mark)));
+
+    TicTacToe {
+        board: board_cell,
+        turn: turn_cell,
+        moves: index_mark_stream,
+        winner: winner_stream,
+        error: error_stream,
+    }
 }
 
 impl IndexValidator {
@@ -83,11 +89,14 @@ impl IndexValidator {
             !board.is_valid_move(*index)
         });
 
+        let error_stream = parse_int_err_stream
+            .map(|e: &ParseIntError| Error::InvalidInteger(e.clone()))
+            .or_else(&invalid_index_stream.map(|i: &usize| Error::InvalidIndex(*i)))
+            .or_else(&invalid_move_stream.map(|i: &usize| Error::InvalidMove(*i)));
+
         IndexValidator {
             valid_move_stream,
-            invalid_move_stream,
-            invalid_index_stream,
-            parse_int_err_stream,
+            error_stream,
         }
     }
 }
