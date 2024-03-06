@@ -13,11 +13,23 @@ use setup::{set_up_play, Error};
 fn main() {
     let ctx = SodiumCtx::new();
 
-    let (kb_input, _listeners) = ctx.transaction(|| {
+    let (start_game, kb_input, _listeners) = ctx.transaction(|| {
         let mut listeners = Vec::new();
+
+        let start_game: StreamSink<()> = ctx.new_stream_sink();
         let kb_input: StreamSink<String> = ctx.new_stream_sink();
 
         let game = set_up_play(&kb_input, &ctx);
+
+        listeners.push(start_game.stream().listen({
+            let turn = game.turn.clone();
+            let board = game.board.clone();
+            move |_: &()| {
+                println!("Welcome to Tic Tac Toe!");
+                println!("{:?} plays first!\n", turn.sample());
+                println!("{}", board.sample());
+            }
+        }));
 
         listeners.push(game.error.listen(|err: &Error| println!("{}", err)));
 
@@ -36,10 +48,12 @@ fn main() {
                 .listen(|mark: &Mark| println!("{:?} has won the game!", mark)),
         );
 
-        (kb_input, listeners)
+        (start_game, kb_input, listeners)
     });
 
     let stdin = std::io::stdin().lock();
+
+    start_game.send(());
     for line in stdin.lines() {
         kb_input.send(line.unwrap());
     }
