@@ -48,11 +48,24 @@ impl Board {
 
     fn display_squares(&self) -> [&'static str; 9] {
         let mut display = [""; 9];
-        for (dsquare, square) in display.iter_mut().zip(self.squares.iter()) {
+        for (index, (dsquare, square)) in display.iter_mut().zip(self.squares.iter()).enumerate() {
             match square {
                 Some(Mark::X) => *dsquare = "X",
                 Some(Mark::O) => *dsquare = "O",
-                None => *dsquare = " ",
+                None => {
+                    *dsquare = match index {
+                        0 => "1",
+                        1 => "2",
+                        2 => "3",
+                        3 => "4",
+                        4 => "5",
+                        5 => "6",
+                        6 => "7",
+                        7 => "8",
+                        8 => "9",
+                        _ => " ",
+                    }
+                }
             }
         }
         display
