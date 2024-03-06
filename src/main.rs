@@ -33,9 +33,9 @@ fn main() {
 
         listeners.push(game.error.listen(|err: &Error| println!("{}", err)));
 
-        // listeners.push(index_mark_stream.listen(|(index, mark): &(usize, Mark)| {
-        //     println!("\nMark an {:?} at index {}:", mark, index)
-        // }));
+        listeners.push(game.moves.listen(|(index, mark): &(usize, Mark)| {
+            println!("\n{:?}s took space {}:", mark, index)
+        }));
 
         listeners.push(
             game.board
