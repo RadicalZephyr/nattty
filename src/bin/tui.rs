@@ -1,7 +1,7 @@
 use std::{io, thread, time::Duration};
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
+    event::{self, DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -16,14 +16,14 @@ use tui::{
 };
 
 fn main() -> io::Result<()> {
-    let ctx = na::SodiumCtx::new();
-
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    let ctx = na::SodiumCtx::new();
 
     let (start_game, kb_input, game) = ctx.transaction(|| {
         let start_game: na::StreamSink<()> = ctx.new_stream_sink();
@@ -43,10 +43,15 @@ fn main() -> io::Result<()> {
         error,
     } = game;
     let ui = Ui { turn, board };
+    let playing_cell_sink = ctx.new_cell_sink(true);
+    let playing_cell = playing_cell_sink.cell();
 
-    terminal.draw(move |f| ui.draw(f))?;
+    thread::spawn(move || dispatch_events(kb_input, playing_cell_sink));
 
-    thread::sleep(Duration::from_millis(5000));
+    while playing_cell.sample() {
+        terminal.draw(|f| ui.draw(f))?;
+        thread::sleep(Duration::from_millis(30));
+    }
 
     // restore terminal
     disable_raw_mode()?;
@@ -58,6 +63,28 @@ fn main() -> io::Result<()> {
     terminal.show_cursor()?;
 
     Ok(())
+}
+
+fn dispatch_events(
+    kb_input: na::StreamSink<String>,
+    playing_cell_sink: na::CellSink<bool>,
+) -> io::Result<()> {
+    loop {
+        match event::read()? {
+            event::Event::Key(ev) => match ev.code {
+                event::KeyCode::Esc => playing_cell_sink.send(false),
+                event::KeyCode::Char(c) if ('1'..='9').contains(&c) => {
+                    kb_input.send(String::from(c));
+                }
+                _ => (),
+            },
+            event::Event::FocusGained => (),
+            event::Event::FocusLost => (),
+            event::Event::Mouse(_) => (),
+            event::Event::Paste(_) => (),
+            event::Event::Resize(_, _) => (),
+        }
+    }
 }
 
 struct Ui {
@@ -116,26 +143,26 @@ impl Ui {
         let board = self.board.sample();
         let squares = [
             (
-                board.squares[0],
+                board.squares[6],
                 hchunks0[1],
                 Borders::RIGHT | Borders::BOTTOM,
             ),
-            (board.squares[1], hchunks0[2], Borders::ALL ^ Borders::TOP),
+            (board.squares[7], hchunks0[2], Borders::ALL ^ Borders::TOP),
             (
-                board.squares[2],
+                board.squares[8],
                 hchunks0[3],
                 Borders::LEFT | Borders::BOTTOM,
             ),
             (board.squares[3], hchunks1[1], Borders::ALL ^ Borders::LEFT),
             (board.squares[4], hchunks1[2], Borders::ALL),
             (board.squares[5], hchunks1[3], Borders::ALL ^ Borders::RIGHT),
-            (board.squares[6], hchunks2[1], Borders::RIGHT | Borders::TOP),
+            (board.squares[0], hchunks2[1], Borders::RIGHT | Borders::TOP),
             (
-                board.squares[7],
+                board.squares[1],
                 hchunks2[2],
                 Borders::ALL ^ Borders::BOTTOM,
             ),
-            (board.squares[8], hchunks2[3], Borders::LEFT | Borders::TOP),
+            (board.squares[2], hchunks2[3], Borders::LEFT | Borders::TOP),
         ];
 
         for (mark, chunk, borders) in squares {
