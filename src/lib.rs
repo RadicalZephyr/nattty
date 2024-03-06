@@ -21,6 +21,7 @@ pub enum Error {
 pub struct Players {}
 
 pub struct SequenceOfGames {
+    pub playing: Cell<bool>,
     pub prompt_player_name: Stream<()>,
     pub start_game: Stream<()>,
 }
@@ -41,7 +42,9 @@ struct IndexValidator {
 impl SequenceOfGames {
     pub fn new(ctx: &SodiumCtx, boot: &Stream<()>, kb_input: &Stream<String>) -> SequenceOfGames {
         let start_game = ctx.new_stream();
+        let playing_cell = start_game.map(|_: &()| true).hold(false);
         SequenceOfGames {
+            playing: playing_cell,
             prompt_player_name: boot.clone(),
             start_game,
         }
