@@ -29,7 +29,7 @@ fn main() -> io::Result<()> {
         let start_game: na::StreamSink<()> = ctx.new_stream_sink();
         let kb_input: na::StreamSink<String> = ctx.new_stream_sink();
 
-        let game = TicTacToe::new(&kb_input, &ctx);
+        let game = TicTacToe::new(&ctx, &kb_input);
 
         (start_game, kb_input, game)
     });

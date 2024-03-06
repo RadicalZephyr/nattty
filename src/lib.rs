@@ -32,7 +32,7 @@ struct IndexValidator {
 }
 
 impl TicTacToe {
-    pub fn new(kb_input: &StreamSink<String>, ctx: &SodiumCtx) -> TicTacToe {
+    pub fn new(ctx: &SodiumCtx, kb_input: &StreamSink<String>) -> TicTacToe {
         let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
         let board_cell_fwd = board_cell_loop.cell();
 

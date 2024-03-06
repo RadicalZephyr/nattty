@@ -13,7 +13,7 @@ fn main() {
         let start_game: StreamSink<()> = ctx.new_stream_sink();
         let kb_input: StreamSink<String> = ctx.new_stream_sink();
 
-        let game = TicTacToe::new(&kb_input, &ctx);
+        let game = TicTacToe::new(&ctx, &kb_input);
 
         listeners.push(start_game.stream().listen({
             let turn = game.turn.clone();
