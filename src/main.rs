@@ -1,11 +1,8 @@
-#![allow(dead_code)]
-
 use std::io::BufRead;
 
 use sodium::{SodiumCtx, StreamSink};
 
-mod tic_tac_toe;
-use tic_tac_toe::{Board, Error, Mark, TicTacToe};
+use nattty::{Board, Error, Mark, TicTacToe};
 
 fn main() {
     let ctx = SodiumCtx::new();
