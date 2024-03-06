@@ -7,8 +7,8 @@ use sodium::{SodiumCtx, StreamSink};
 
 pub(crate) mod board;
 
-mod setup;
-use setup::{Error, TicTacToe};
+mod tic_tac_toe;
+use tic_tac_toe::{Error, TicTacToe};
 
 fn main() {
     let ctx = SodiumCtx::new();
