@@ -6,8 +6,9 @@ use super::board::{Board, Mark};
 
 struct IndexValidator {
     valid_move_stream: Stream<usize>,
-    parse_int_err_stream: Stream<ParseIntError>,
+    invalid_move_stream: Stream<usize>,
     invalid_index_stream: Stream<usize>,
+    parse_int_err_stream: Stream<ParseIntError>,
 }
 
 pub fn set_up_play(
@@ -21,8 +22,9 @@ pub fn set_up_play(
     let kb_stream = kb_input.stream();
     let IndexValidator {
         valid_move_stream,
-        parse_int_err_stream: _,
+        invalid_move_stream: _,
         invalid_index_stream: _,
+        parse_int_err_stream: _,
     } = IndexValidator::new(&kb_stream, &board_cell_fwd);
     // listeners.push(parse_int_err_stream.listen(|err: &ParseIntError| println!("invalid input: {}", err)));
     // listeners.push(
@@ -70,16 +72,22 @@ impl IndexValidator {
             .map(|index: &usize| index - 1);
         let invalid_index_stream = index_stream.filter(|index: &usize| !(1..=9).contains(index));
 
-        let board_cell = board_cell.clone();
+        let board = board_cell.clone();
         let valid_move_stream = valid_index_stream.filter(move |index: &usize| {
-            let board = board_cell.sample();
+            let board = board.sample();
             board.is_valid_move(*index)
+        });
+        let board = board_cell.clone();
+        let invalid_move_stream = valid_index_stream.filter(move |index: &usize| {
+            let board = board.sample();
+            !board.is_valid_move(*index)
         });
 
         IndexValidator {
             valid_move_stream,
-            parse_int_err_stream,
+            invalid_move_stream,
             invalid_index_stream,
+            parse_int_err_stream,
         }
     }
 }
