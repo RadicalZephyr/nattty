@@ -30,40 +30,42 @@ struct IndexValidator {
     error_stream: Stream<Error>,
 }
 
-pub fn set_up_play(kb_input: &StreamSink<String>, ctx: &SodiumCtx) -> TicTacToe {
-    let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
-    let board_cell_fwd = board_cell_loop.cell();
+impl TicTacToe {
+    pub fn new(kb_input: &StreamSink<String>, ctx: &SodiumCtx) -> TicTacToe {
+        let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
+        let board_cell_fwd = board_cell_loop.cell();
 
-    let kb_stream = kb_input.stream();
-    let IndexValidator {
-        valid_move_stream,
-        error_stream,
-    } = IndexValidator::new(&kb_stream, &board_cell_fwd);
+        let kb_stream = kb_input.stream();
+        let IndexValidator {
+            valid_move_stream,
+            error_stream,
+        } = IndexValidator::new(&kb_stream, &board_cell_fwd);
 
-    // Alternate marks
-    let turn_cell = mark_swapping(ctx, &valid_move_stream);
+        // Alternate marks
+        let turn_cell = mark_swapping(ctx, &valid_move_stream);
 
-    let index_mark_stream =
-        valid_move_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
+        let index_mark_stream =
+            valid_move_stream.snapshot(&turn_cell, |index: &usize, turn: &Mark| (*index, *turn));
 
-    let board_stream = &valid_move_stream.snapshot3(
-        &board_cell_fwd,
-        &turn_cell,
-        |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
-    );
-    let board_cell = board_stream.hold(Board::new());
-    board_cell_loop.loop_(&board_cell);
+        let board_stream = &valid_move_stream.snapshot3(
+            &board_cell_fwd,
+            &turn_cell,
+            |index: &usize, board: &Board, mark: &Mark| board.mark(*index, *mark),
+        );
+        let board_cell = board_stream.hold(Board::new());
+        board_cell_loop.loop_(&board_cell);
 
-    let winner_stream = board_stream
-        .map(|board: &Board| board.get_winner())
-        .filter_option();
+        let winner_stream = board_stream
+            .map(|board: &Board| board.get_winner())
+            .filter_option();
 
-    TicTacToe {
-        board: board_cell,
-        turn: turn_cell,
-        moves: index_mark_stream,
-        winner: winner_stream,
-        error: error_stream,
+        TicTacToe {
+            board: board_cell,
+            turn: turn_cell,
+            moves: index_mark_stream,
+            winner: winner_stream,
+            error: error_stream,
+        }
     }
 }
 
