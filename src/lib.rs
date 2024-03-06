@@ -1,6 +1,6 @@
 use std::num::ParseIntError;
 
-use sodium::{Cell, CellLoop, SodiumCtx, Stream, StreamSink};
+use sodium::{Cell, CellLoop, SodiumCtx, Stream};
 use thiserror::Error;
 
 mod board;
@@ -49,15 +49,14 @@ impl SequenceOfGames {
 }
 
 impl TicTacToe {
-    pub fn new(ctx: &SodiumCtx, kb_input: &StreamSink<String>) -> TicTacToe {
+    pub fn new(ctx: &SodiumCtx, kb_input: &Stream<String>) -> TicTacToe {
         let board_cell_loop: CellLoop<Board> = ctx.new_cell_loop();
         let board_cell_fwd = board_cell_loop.cell();
 
-        let kb_stream = kb_input.stream();
         let IndexValidator {
             valid_move_stream,
             error_stream,
-        } = IndexValidator::new(&kb_stream, &board_cell_fwd);
+        } = IndexValidator::new(kb_input, &board_cell_fwd);
 
         // Alternate marks
         let turn_cell = mark_swapping(ctx, &valid_move_stream);

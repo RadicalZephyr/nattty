@@ -22,7 +22,7 @@ fn main() {
             println!("Who is playing today?");
         }));
 
-        let game = TicTacToe::new(&ctx, &kb_input);
+        let game = TicTacToe::new(&ctx, &kb_input.stream());
 
         listeners.push(game_seq.start_game.listen({
             let turn = game.turn.clone();
