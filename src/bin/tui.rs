@@ -83,11 +83,11 @@ impl Ui {
 
     fn draw_board<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
         let thirds = [
-            Constraint::Ratio(1, 5),
-            Constraint::Ratio(1, 5),
-            Constraint::Ratio(1, 5),
-            Constraint::Ratio(1, 5),
-            Constraint::Ratio(1, 5),
+            Constraint::Percentage(5),
+            Constraint::Percentage(29),
+            Constraint::Percentage(34),
+            Constraint::Percentage(30),
+            Constraint::Percentage(5),
         ];
         let vchunks = Layout::default()
             .direction(Direction::Vertical)
