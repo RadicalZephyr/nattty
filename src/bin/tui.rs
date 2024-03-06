@@ -12,7 +12,7 @@ use tui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     symbols::block,
-    widgets::{Block, Borders, Row, Table},
+    widgets::{Block, Borders, Row, Table, Widget},
     Frame, Terminal,
 };
 
@@ -102,6 +102,7 @@ impl Ui {
             .constraints(thirds.as_ref())
             .split(vchunks[1]);
         let block = Block::default().borders(Borders::RIGHT | Borders::BOTTOM);
+        f.render_widget(RenderMark(Some(Mark::X)), block.inner(hchunks0[1]));
         f.render_widget(block, hchunks0[1]);
         let block = Block::default().borders(Borders::ALL ^ Borders::TOP);
         f.render_widget(block, hchunks0[2]);
@@ -135,3 +136,34 @@ impl Ui {
         f.render_widget(block, hchunks2[3]);
     }
 }
+
+struct RenderMark(Option<Mark>);
+
+impl Widget for RenderMark {
+    fn render(self, area: Rect, buf: &mut tui::buffer::Buffer) {
+        if let Some(mark) = self.0 {
+            match mark {
+                Mark::X => render_x(area, buf),
+                Mark::O => render_o(area, buf),
+            }
+        }
+    }
+}
+
+fn render_x(area: Rect, buf: &mut tui::buffer::Buffer) {
+    const LEFT: &str = "\\@\\";
+    const RIGHT: &str = "/@/";
+
+    // In theory this should be the number of characters to go over for each line
+    // -2 because the line is 3 characters wide
+    let inv_slope = (area.width).div_euclid(area.height);
+    for y in 0..area.height {
+        let x_left = area.width - 5 - (y * inv_slope);
+        buf.set_string(area.x + x_left, area.y + y, RIGHT, Style::default());
+
+        let x_right = y * inv_slope;
+        buf.set_string(area.x + x_right, area.y + y, LEFT, Style::default());
+    }
+}
+
+fn render_o(area: Rect, buf: &mut tui::buffer::Buffer) {}
