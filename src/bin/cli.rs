@@ -2,24 +2,32 @@ use std::io::BufRead;
 
 use sodium::{SodiumCtx, StreamSink};
 
-use nattty::{Board, Error, Mark, TicTacToe};
+use nattty::{Board, Error, Mark, SequenceOfGames, TicTacToe};
 
 fn main() {
     let ctx = SodiumCtx::new();
 
-    let (start_game, kb_input, _listeners) = ctx.transaction(|| {
+    let (boot, kb_input, _listeners) = ctx.transaction(|| {
         let mut listeners = Vec::new();
 
-        let start_game: StreamSink<()> = ctx.new_stream_sink();
+        let boot: StreamSink<()> = ctx.new_stream_sink();
         let kb_input: StreamSink<String> = ctx.new_stream_sink();
+
+        let game_seq = SequenceOfGames::new(&ctx, &boot.stream(), &kb_input.stream());
+
+        listeners.push(boot.stream().listen(|_: &()| {
+            println!("Welcome to Tic Tac Toe!\n");
+        }));
+        listeners.push(game_seq.prompt_player_name.listen(|_: &()| {
+            println!("Who is playing today?");
+        }));
 
         let game = TicTacToe::new(&ctx, &kb_input);
 
-        listeners.push(start_game.stream().listen({
+        listeners.push(game_seq.start_game.listen({
             let turn = game.turn.clone();
             let board = game.board.clone();
             move |_: &()| {
-                println!("Welcome to Tic Tac Toe!");
                 println!("{:?} plays first!\n", turn.sample());
                 println!("{}", board.sample());
             }
@@ -42,12 +50,12 @@ fn main() {
                 .listen(|mark: &Mark| println!("{:?} has won the game!", mark)),
         );
 
-        (start_game, kb_input, listeners)
+        (boot, kb_input, listeners)
     });
 
     let stdin = std::io::stdin().lock();
 
-    start_game.send(());
+    boot.send(());
     for line in stdin.lines() {
         kb_input.send(line.unwrap());
     }

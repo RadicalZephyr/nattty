@@ -18,6 +18,13 @@ pub enum Error {
     InvalidInteger(ParseIntError),
 }
 
+pub struct Players {}
+
+pub struct SequenceOfGames {
+    pub prompt_player_name: Stream<()>,
+    pub start_game: Stream<()>,
+}
+
 pub struct TicTacToe {
     pub board: Cell<Board>,
     pub turn: Cell<Mark>,
@@ -29,6 +36,16 @@ pub struct TicTacToe {
 struct IndexValidator {
     valid_move_stream: Stream<usize>,
     error_stream: Stream<Error>,
+}
+
+impl SequenceOfGames {
+    pub fn new(ctx: &SodiumCtx, boot: &Stream<()>, kb_input: &Stream<String>) -> SequenceOfGames {
+        let start_game = ctx.new_stream();
+        SequenceOfGames {
+            prompt_player_name: boot.clone(),
+            start_game,
+        }
+    }
 }
 
 impl TicTacToe {
