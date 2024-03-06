@@ -31,7 +31,7 @@ impl Mark {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Board {
-    squares: [Option<Mark>; 9],
+    pub squares: [Option<Mark>; 9],
 }
 
 impl Board {
