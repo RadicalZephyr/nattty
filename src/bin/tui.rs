@@ -9,7 +9,7 @@ use nattty::{Board, Mark, TicTacToe};
 use sodium as na;
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style},
     symbols::block,
     widgets::{Block, Borders, Row, Table, Widget},
@@ -118,6 +118,7 @@ impl Ui {
         let block = Block::default().borders(Borders::ALL ^ Borders::LEFT);
         f.render_widget(block, hchunks1[1]);
         let block = Block::default().borders(Borders::ALL);
+        f.render_widget(RenderMark(Some(Mark::O)), block.inner(hchunks1[2]));
         f.render_widget(block, hchunks1[2]);
         let block = Block::default().borders(Borders::ALL ^ Borders::RIGHT);
         f.render_widget(block, hchunks1[3]);
@@ -166,4 +167,37 @@ fn render_x(area: Rect, buf: &mut tui::buffer::Buffer) {
     }
 }
 
-fn render_o(area: Rect, buf: &mut tui::buffer::Buffer) {}
+fn render_o(area: Rect, buf: &mut tui::buffer::Buffer) {
+    let x_offset;
+    let y_offset;
+    if area.width >= area.height {
+        x_offset = (area.width - area.height).div_euclid(2);
+        y_offset = 0;
+    } else {
+        x_offset = 0;
+        y_offset = (area.height - area.width).div_euclid(2);
+    }
+
+    let diameter = area.width.min(area.height);
+    let radius = diameter.div_euclid(2);
+    let center_x = (area.x + radius + x_offset) as i32;
+    let center_y = (area.y + radius + y_offset) as i32;
+
+    let radius = radius as f32;
+    let min_angle = (1.0 - 1.0 / radius).acos().to_radians();
+
+    let mut angle = 0.0;
+
+    while angle < std::f32::consts::PI {
+        let (sin, cos) = angle.sin_cos();
+        let x_offset: i32 = unsafe { (radius * cos).to_int_unchecked() };
+        let y_offset: i32 = unsafe { (radius * sin).to_int_unchecked() };
+
+        let x = center_x + x_offset;
+        let y = center_y + y_offset;
+        buf.get_mut(x as u16, y as u16).set_char('@');
+        let y = center_y - y_offset;
+        buf.get_mut(x as u16, y as u16).set_char('@');
+        angle += min_angle;
+    }
+}
