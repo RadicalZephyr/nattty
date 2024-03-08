@@ -18,16 +18,41 @@ pub enum Error {
     InvalidInteger(ParseIntError),
 }
 
-pub struct Players {}
-
 #[derive(Copy, Clone, Debug)]
 pub enum AppState {
     RegisterPlayer,
     Playing,
 }
 
+#[derive(Clone, Debug)]
+pub struct Player {
+    name: String,
+}
+
+impl Player {
+    pub fn new(name: String) -> Self {
+        Self { name }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Players {
+    x: Player,
+    o: Player,
+}
+
+impl Players {
+    fn new(name1: String, name2: String) -> Players {
+        Players {
+            x: Player::new(name1),
+            o: Player::new(name2),
+        }
+    }
+}
+
 pub struct SequenceOfGames {
     pub app_state: Cell<AppState>,
+    pub players: Cell<Option<Players>>,
     pub prompt_player_name: Stream<()>,
     pub start_game: Stream<()>,
 }
@@ -57,20 +82,38 @@ impl SequenceOfGames {
         new_matchup: &Stream<()>,
         kb_input: &Stream<String>,
     ) -> SequenceOfGames {
-        let start_game = ctx.new_stream();
+        let start_game_loop = ctx.new_stream_loop();
+        let start_game = start_game_loop.stream();
 
         let app_state_cell = start_game
             .map(|_: &()| AppState::Playing)
             .hold(AppState::RegisterPlayer);
         let not_playing_cell = app_state_cell.map(|app_state: &AppState| !app_state.is_playing());
 
-        let input = kb_input.gate(&not_playing_cell);
+        let prompt_player_name = kb_input.gate(&not_playing_cell);
 
-        let prompt_player_name = new_matchup.gate(&not_playing_cell);
+        type State = Option<String>;
+        let players_opt_stream =
+            prompt_player_name.collect(None, |input: &String, state: &State| match state {
+                None => (None, Some(input.clone())),
+                Some(name1) => {
+                    let players = Players::new(name1.clone(), input.clone());
+                    (Some(players), None)
+                }
+            });
+        let start_game = players_opt_stream.filter_option().map(|_: &_| ());
+        start_game_loop.loop_(&start_game);
 
-        let start_game = ctx.new_stream();
+        let players_cell = players_opt_stream.hold(None);
+
+        let no_players_yet_stream = players_opt_stream.filter_map(|players: &_| match players {
+            Some(_) => None,
+            None => Some(()),
+        });
+        let prompt_player_name = new_matchup.or_else(&no_players_yet_stream);
         SequenceOfGames {
             app_state: app_state_cell,
+            players: players_cell,
             prompt_player_name,
             start_game,
         }
