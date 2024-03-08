@@ -2,7 +2,7 @@ use std::io::BufRead;
 
 use sodium::{SodiumCtx, StreamSink};
 
-use nattty::{Board, Error, Mark, SequenceOfGames, TicTacToe};
+use nattty::{AppState, Board, Error, Mark, SequenceOfGames, TicTacToe};
 
 fn main() {
     let ctx = SodiumCtx::new();
@@ -23,7 +23,10 @@ fn main() {
             println!("Who is playing today?");
         }));
 
-        let game = TicTacToe::new(&ctx, &kb_stream.gate(&game_seq.playing));
+        let playing_cell = game_seq
+            .app_state
+            .map(|app_state: &AppState| app_state.is_playing());
+        let game = TicTacToe::new(&ctx, &kb_stream.gate(&playing_cell));
 
         listeners.push(game_seq.start_game.listen({
             let turn = game.turn.clone();

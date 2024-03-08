@@ -20,8 +20,14 @@ pub enum Error {
 
 pub struct Players {}
 
+#[derive(Copy, Clone, Debug)]
+pub enum AppState {
+    RegisterPlayer,
+    Playing,
+}
+
 pub struct SequenceOfGames {
-    pub playing: Cell<bool>,
+    pub app_state: Cell<AppState>,
     pub prompt_player_name: Stream<()>,
     pub start_game: Stream<()>,
 }
@@ -39,6 +45,12 @@ struct IndexValidator {
     error_stream: Stream<Error>,
 }
 
+impl AppState {
+    pub fn is_playing(&self) -> bool {
+        matches!(self, AppState::Playing)
+    }
+}
+
 impl SequenceOfGames {
     pub fn new(
         ctx: &SodiumCtx,
@@ -47,16 +59,18 @@ impl SequenceOfGames {
     ) -> SequenceOfGames {
         let start_game = ctx.new_stream();
 
-        let playing_cell = start_game.map(|_: &()| true).hold(false);
-        let not_playing_cell = playing_cell.map(|p: &bool| !p);
+        let app_state_cell = start_game
+            .map(|_: &()| AppState::Playing)
+            .hold(AppState::RegisterPlayer);
+        let not_playing_cell = app_state_cell.map(|app_state: &AppState| !app_state.is_playing());
 
-        let kb_input = kb_input.gate(&not_playing_cell);
+        let input = kb_input.gate(&not_playing_cell);
 
         let prompt_player_name = new_matchup.gate(&not_playing_cell);
 
         let start_game = ctx.new_stream();
         SequenceOfGames {
-            playing: playing_cell,
+            app_state: app_state_cell,
             prompt_player_name,
             start_game,
         }
