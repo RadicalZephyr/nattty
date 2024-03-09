@@ -48,6 +48,13 @@ impl Players {
             o: Player::new(name2),
         }
     }
+
+    pub fn get_name(&self, mark: &Mark) -> &String {
+        match mark {
+            Mark::X => &self.x.name,
+            Mark::O => &self.o.name,
+        }
+    }
 }
 
 pub struct SequenceOfGames {

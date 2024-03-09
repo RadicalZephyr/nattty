@@ -40,19 +40,31 @@ fn main() {
         listeners.push(game.error.listen(|err: &Error| println!("{}", err)));
 
         listeners.push(game.moves.listen(|(index, mark): &(usize, Mark)| {
-            println!("\n{:?}s took space {}:", mark, index)
+            println!("\n{:?}s took space {}:", mark, index + 1)
         }));
 
-        listeners.push(
-            game.board
-                .updates()
-                .listen(|board: &Board| println!("{}", board)),
-        );
+        listeners.push(game.board.updates().listen({
+            let players = game_seq.players.clone();
+            let turn = game.turn.clone();
+            move |board: &Board| {
+                let players = players.sample();
+                let mark = turn.sample().swap();
+                println!("{}", board);
+                println!("{}'s turn to play an {:?}", players.get_name(&mark), mark);
+            }
+        }));
 
-        listeners.push(
-            game.winner
-                .listen(|mark: &Mark| println!("{:?} has won the game!", mark)),
-        );
+        listeners.push(game.winner.listen({
+            let players = game_seq.players.clone();
+            move |mark: &Mark| {
+                let players = players.sample();
+                println!(
+                    "{} playing {:?}s has won the game!",
+                    players.get_name(mark),
+                    mark
+                );
+            }
+        }));
 
         (boot, kb_input, listeners)
     });
