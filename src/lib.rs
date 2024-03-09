@@ -24,7 +24,7 @@ pub enum AppState {
     Playing,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Player {
     name: String,
 }
@@ -35,7 +35,7 @@ impl Player {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Players {
     x: Player,
     o: Player,
@@ -52,7 +52,7 @@ impl Players {
 
 pub struct SequenceOfGames {
     pub app_state: Cell<AppState>,
-    pub players: Cell<Option<Players>>,
+    pub players: Cell<Players>,
     pub prompt_player_name: Stream<()>,
     pub start_game: Stream<()>,
 }
@@ -101,10 +101,11 @@ impl SequenceOfGames {
                     (Some(players), None)
                 }
             });
-        let start_game = players_opt_stream.filter_option().map(|_: &_| ());
+        let players_stream = &players_opt_stream.filter_option();
+        let start_game = players_stream.map(|_: &_| ());
         start_game_loop.loop_(&start_game);
 
-        let players_cell = players_opt_stream.hold(None);
+        let players_cell = players_stream.hold(Players::default());
 
         let no_players_yet_stream = players_opt_stream.filter_map(|players: &_| match players {
             Some(_) => None,
