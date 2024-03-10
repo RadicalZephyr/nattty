@@ -6,7 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossterm = "0.27.0"
 sodium = "0.1.1"
 thiserror = "1.0.57"
-tui = "0.19.0"
+
+crossterm = { version = "0.27.0", optional = true }
+tui = { version = "0.19.0", optional = true }
+
+[features]
+tui = ["dep:tui", "dep:crossterm"]
+
+[[bin]]
+name = "ttt-tui"
+path = "src/bin/tui.rs"
+required-features = ["tui"]
+test = false
+bench = false
